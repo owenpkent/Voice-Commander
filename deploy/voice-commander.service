@@ -1,0 +1,27 @@
+# /etc/systemd/system/voice-commander.service
+# Adjust the paths below to your deployment location and venv
+[Unit]
+Description=Voice Commander FastAPI Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Voice-Commander
+# Use your venv's python
+ExecStart=/home/ubuntu/Voice-Commander/.venv-cloud/bin/python -m uvicorn cloud.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+# Environment variables
+Environment=PYTHONUNBUFFERED=1
+Environment=VC_S3_BUCKET=voice-commander-data-opk
+Environment=VC_STREAM_MODEL=tiny.en
+Environment=VC_STREAM_DEVICE=cpu
+Environment=VC_STREAM_COMPUTE=int8
+Environment=VC_STREAM_MIN_SEC=0.8
+Environment=VC_BATCH_MODEL=small
+Environment=VC_BATCH_DEVICE=cpu
+Environment=VC_BATCH_COMPUTE=int8
+
+[Install]
+WantedBy=multi-user.target

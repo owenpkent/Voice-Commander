@@ -1,0 +1,20 @@
+version: "3.9"
+services:
+  voice-commander:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voice-commander
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - VC_S3_BUCKET=voice-commander-data-opk
+      - VC_STREAM_MODEL=tiny.en
+      - VC_STREAM_DEVICE=cpu
+      - VC_STREAM_COMPUTE=int8
+      - VC_STREAM_MIN_SEC=0.8
+      - VC_BATCH_MODEL=small
+      - VC_BATCH_DEVICE=cpu
+      - VC_BATCH_COMPUTE=int8
