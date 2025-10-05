@@ -17,7 +17,6 @@ A minimal local desktop app (Tkinter) to record audio and transcribe it using Op
 2. Install dependencies
    ```powershell
    pip install -r requirements.txt
-   ```
 3. Set your OpenAI API key
    - For current PowerShell session:
      ```powershell
@@ -30,9 +29,17 @@ A minimal local desktop app (Tkinter) to record audio and transcribe it using Op
 
 ## Run
 ```powershell
-python app.py
+python run.py
 ```
-
+### CLI (no UI)
+Transcribe an audio file and print the text to stdout:
+```powershell
+python run.py --transcribe latest.wav
+```
+Optional model flag (default `whisper-1`):
+```powershell
+python run.py --transcribe latest.wav --model whisper-1
+```
 ## Usage
 - Click "Record" to start. Speak.
 - Click "Stop" to save `latest.wav`.
@@ -43,7 +50,6 @@ python app.py
 - The app uses `sounddevice` to capture audio at 16 kHz mono, 16-bit.
 - `OPENAI_API_KEY` must be set before transcribing.
 - `latest.wav` is written in the repo folder and is git-ignored.
-
 ## Troubleshooting
 - No input device found: ensure a microphone is connected and enabled in Windows Sound settings.
 - PortAudio errors: try updating audio drivers; ensure only one app uses the mic.
