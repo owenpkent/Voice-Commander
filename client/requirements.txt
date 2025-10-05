@@ -1,2 +1,0 @@
-websockets>=12,<13
-sounddevice>=0.4,<0.5
