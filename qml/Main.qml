@@ -44,6 +44,34 @@ ApplicationWindow {
             Item { Layout.fillWidth: true }
         }
 
+        // Command Mode toggle and last command
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 12
+
+            Label { text: "Command Mode" }
+            Switch {
+                id: cmdSwitch
+                checked: controller.commandMode
+                onToggled: controller.commandMode = checked
+            }
+
+            CheckBox {
+                id: requireWake
+                text: "Require 'Command' wake word"
+                checked: controller.requireWakeWord
+                onToggled: controller.requireWakeWord = checked
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: controller.lastCommand && controller.lastCommand.length > 0 ?
+                        ("Last: " + controller.lastCommand) : "Last: —"
+                color: "#bbb"
+                elide: Text.ElideRight
+            }
+        }
+
         // Level meter with mic icon
         RowLayout {
             Layout.fillWidth: true
@@ -107,6 +135,54 @@ ApplicationWindow {
             color: "#bbb"
             Layout.fillWidth: true
             elide: Text.ElideRight
+        }
+
+        // Debug log controls
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            CheckBox {
+                id: showLog
+                text: "Show Debug Log"
+                checked: false
+            }
+            Button {
+                text: "Clear Log"
+                onClicked: controller.clearLog()
+            }
+            Item { Layout.fillWidth: true }
+        }
+
+        // Debug log view
+        Rectangle {
+            visible: showLog.checked
+            Layout.fillWidth: true
+            Layout.preferredHeight: 160
+            radius: 6
+            color: "#222"
+            border.color: "#444"
+            border.width: 1
+
+            ScrollView {
+                anchors.fill: parent
+                clip: true
+                TextArea {
+                    id: logArea
+                    anchors.fill: parent
+                    readOnly: true
+                    wrapMode: Text.NoWrap
+                    text: controller.logText
+                    font.family: "Consolas"
+                    font.pixelSize: 12
+                    onTextChanged: {
+                        cursorPosition = text.length
+                        if (flickableItem) {
+                            flickableItem.contentY = flickableItem.contentHeight
+                        }
+                    }
+                }
+            }
         }
 
         // Transcript

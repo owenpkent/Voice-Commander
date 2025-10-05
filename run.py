@@ -97,6 +97,122 @@ def ensure_faster_whisper():
             sys.exit(1)
 
 
+def ensure_torch():
+    # Ensure torch is importable; install CPU wheel if missing
+    try:
+        import torch  # noqa: F401
+        return
+    except Exception:
+        pass
+    # Try install from PyPI
+    if not _pip_install("torch>=2.1.0"):
+        _upgrade_build_tools()
+        if not _pip_install("torch>=2.1.0"):
+            # Fallback to PyTorch CPU wheels index
+            print("Retrying torch install from PyTorch CPU wheels index...")
+            res = subprocess.run([
+                sys.executable, "-m", "pip", "install",
+                "--index-url", "https://download.pytorch.org/whl/cpu",
+                "torch>=2.1.0"
+            ], capture_output=True, text=True)
+            if res.returncode != 0:
+                print(res.stdout)
+                print(res.stderr, file=sys.stderr)
+                print("Error: failed to install 'torch'.", file=sys.stderr)
+                sys.exit(1)
+    try:
+        import torch  # noqa: F401
+    except Exception as e:
+        print(f"Error importing torch after install: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def ensure_keyboard():
+    # Best-effort install; not fatal if missing
+    try:
+        import keyboard  # noqa: F401
+        return
+    except Exception:
+        pass
+    if not _pip_install("keyboard>=0.13.5"):
+        _upgrade_build_tools()
+        if not _pip_install("keyboard>=0.13.5"):
+            print("Warning: failed to install 'keyboard'. Command Mode keystrokes may be unavailable.", file=sys.stderr)
+            return
+    try:
+        import keyboard  # noqa: F401
+    except Exception as e:
+        print(f"Warning: importing 'keyboard' after install failed: {e}", file=sys.stderr)
+        # Non-fatal
+        return
+
+
+def ensure_torchaudio():
+    try:
+        import torchaudio  # noqa: F401
+        return
+    except Exception:
+        pass
+    # Try to match torchaudio to the installed torch version
+    torch_version = None
+    try:
+        import torch  # noqa: F401
+        torch_version = getattr(torch, "__version__", None)
+        if torch_version:
+            torch_version = torch_version.split("+")[0]
+    except Exception:
+        torch_version = None
+
+    def install_torchaudio_spec(spec: str) -> bool:
+        if _pip_install(spec):
+            try:
+                import torchaudio  # noqa: F401
+                return True
+            except Exception:
+                return False
+        return False
+
+    # 1) Try exact match with CPU index if version known
+    if torch_version:
+        print(f"Attempting torchaudio=={torch_version} from PyTorch CPU index...")
+        res = subprocess.run([
+            sys.executable, "-m", "pip", "install",
+            "--index-url", "https://download.pytorch.org/whl/cpu",
+            f"torchaudio=={torch_version}"
+        ], capture_output=True, text=True)
+        if res.returncode == 0:
+            try:
+                import torchaudio  # noqa: F401
+                return
+            except Exception:
+                pass
+        else:
+            print(res.stdout)
+            print(res.stderr, file=sys.stderr)
+
+    # 2) Try generic from PyPI
+    if install_torchaudio_spec("torchaudio>=2.1.0"):
+        return
+
+    # 3) Fallback to CPU index with generic spec
+    print("Retrying torchaudio install from PyTorch CPU wheels index...")
+    res = subprocess.run([
+        sys.executable, "-m", "pip", "install",
+        "--index-url", "https://download.pytorch.org/whl/cpu",
+        "torchaudio>=2.1.0"
+    ], capture_output=True, text=True)
+    if res.returncode != 0:
+        print(res.stdout)
+        print(res.stderr, file=sys.stderr)
+        print("Warning: failed to install 'torchaudio'. Silero VAD may not load.", file=sys.stderr)
+        return
+    try:
+        import torchaudio  # noqa: F401
+    except Exception as e:
+        print(f"Warning: importing torchaudio after install failed: {e}", file=sys.stderr)
+        return
+
+
 def run_ui():
     return run_ui_with_preference(prefer="qml")
 
@@ -124,6 +240,10 @@ def run_ui_with_preference(prefer: str = "qml"):
         from faster_whisper import WhisperModel  # noqa: F401
     except Exception:
         ensure_faster_whisper()
+    # Ensure Command Mode dependencies so qml_app can import successfully
+    ensure_torch()
+    ensure_torchaudio()
+    ensure_keyboard()
 
     ui_order = [prefer, "qml", "tk"] if prefer == "qml" else [prefer, "tk", "qml"]
     for ui in ui_order:
