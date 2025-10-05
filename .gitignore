@@ -18,6 +18,9 @@ build/
 dist/
 *.egg-info/
 
+# Environment files
+.env
+
 # Local artifacts
 latest.wav
 

@@ -3,6 +3,7 @@ import threading
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import scrolledtext
+from tkinter import ttk
 import time
 import wave
 
@@ -13,6 +14,11 @@ try:
     from openai import OpenAI
 except ImportError:
     OpenAI = None  # We'll check at runtime and show a helpful message
+
+try:
+    from faster_whisper import WhisperModel
+except ImportError:
+    WhisperModel = None  # Optional: only needed for local transcription
 
 
 class Recorder:
@@ -96,8 +102,34 @@ class App:
 
         self.recorder = Recorder()
         self.audio_path = os.path.join(os.getcwd(), "latest.wav")
+        self.backend_var = tk.StringVar(value="API")  # API or Local
+        self.local_model_var = tk.StringVar(value="base.en")
 
-        # UI Elements
+        # Options Row (backend + local model)
+        self.opts_frame = tk.Frame(root)
+        self.opts_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
+
+        tk.Label(self.opts_frame, text="Backend:").pack(side=tk.LEFT)
+        self.backend_combo = ttk.Combobox(
+            self.opts_frame,
+            textvariable=self.backend_var,
+            values=["API", "Local"],
+            state="readonly",
+            width=8,
+        )
+        self.backend_combo.pack(side=tk.LEFT, padx=(5, 15))
+
+        tk.Label(self.opts_frame, text="Local model:").pack(side=tk.LEFT)
+        self.local_model_combo = ttk.Combobox(
+            self.opts_frame,
+            textvariable=self.local_model_var,
+            values=["tiny.en", "base.en", "small.en", "medium.en", "large-v3"],
+            state="readonly",
+            width=12,
+        )
+        self.local_model_combo.pack(side=tk.LEFT, padx=5)
+
+        # UI Elements (controls)
         self.btn_frame = tk.Frame(root)
         self.btn_frame.pack(fill=tk.X, padx=10, pady=10)
 
@@ -167,33 +199,62 @@ class App:
 
     def transcribe(self):
         try:
-            self._ensure_openai()
             if not os.path.exists(self.audio_path):
                 messagebox.showwarning("No audio", "Record audio first.")
                 return
             self.transcribe_btn.config(state=tk.DISABLED)
-            self.set_status("Transcribing with OpenAI Whisper...")
+            backend = (self.backend_var.get() or "API").strip()
+            if backend == "API":
+                self.set_status("Transcribing with OpenAI Whisper (API)...")
 
-            def _do_transcribe():
-                try:
-                    client = OpenAI()
-                    with open(self.audio_path, "rb") as f:
-                        result = client.audio.transcriptions.create(
-                            model="whisper-1",
-                            file=f,
-                        )
-                    text = getattr(result, "text", None) or str(result)
-                    self.text.delete("1.0", tk.END)
-                    self.text.insert(tk.END, text)
-                    self.copy_btn.config(state=tk.NORMAL)
-                    self.set_status("Transcription complete.")
-                except Exception as e:
-                    messagebox.showerror("Transcription Error", str(e))
-                    self.set_status("Ready")
-                finally:
-                    self.transcribe_btn.config(state=tk.NORMAL)
+                def _do_transcribe_api():
+                    try:
+                        self._ensure_openai()
+                        client = OpenAI()
+                        with open(self.audio_path, "rb") as f:
+                            result = client.audio.transcriptions.create(
+                                model="whisper-1",
+                                file=f,
+                            )
+                        text = getattr(result, "text", None) or str(result)
+                        self.text.delete("1.0", tk.END)
+                        self.text.insert(tk.END, text)
+                        self.copy_btn.config(state=tk.NORMAL)
+                        self.set_status("Transcription complete.")
+                    except Exception as e:
+                        messagebox.showerror("Transcription Error", str(e))
+                        self.set_status("Ready")
+                    finally:
+                        self.transcribe_btn.config(state=tk.NORMAL)
 
-            threading.Thread(target=_do_transcribe, daemon=True).start()
+                threading.Thread(target=_do_transcribe_api, daemon=True).start()
+            else:
+                self.set_status("Transcribing locally with faster-whisper...")
+
+                def _do_transcribe_local():
+                    try:
+                        if WhisperModel is None:
+                            raise RuntimeError(
+                                "The 'faster-whisper' package is not installed. Run: pip install -r requirements.txt"
+                            )
+                        model_name = (self.local_model_var.get() or "base.en").strip()
+                        model = WhisperModel(model_name, device="cpu", compute_type="int8")
+                        segments, info = model.transcribe(self.audio_path, language="en")
+                        text_parts = []
+                        for seg in segments:
+                            text_parts.append(seg.text)
+                        text = " ".join(text_parts).strip()
+                        self.text.delete("1.0", tk.END)
+                        self.text.insert(tk.END, text)
+                        self.copy_btn.config(state=tk.NORMAL)
+                        self.set_status("Transcription complete (local).")
+                    except Exception as e:
+                        messagebox.showerror("Transcription Error", str(e))
+                        self.set_status("Ready")
+                    finally:
+                        self.transcribe_btn.config(state=tk.NORMAL)
+
+                threading.Thread(target=_do_transcribe_local, daemon=True).start()
         except Exception as e:
             messagebox.showerror("Error", str(e))
             self.set_status("Ready")
